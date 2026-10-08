@@ -77,6 +77,10 @@ export default function ChatPage({
   };
 
   const handleViewProof = (proof) => {
+    if (!isSignedIn) {
+      if (openSignIn) openSignIn();
+      return;
+    }
     const targetProof = proof || activeProofData;
     if (onSelectProof && targetProof) {
       onSelectProof(targetProof);
@@ -84,9 +88,10 @@ export default function ChatPage({
     setIsProofOpen(true);
   };
 
-  // Determine whether to display the welcome screen
-  const hasMessages = chatMessages && chatMessages.length > 0;
-  const showWelcome = !hasMessages && !activeQuestion && !activeProofData && !isProcessing;
+  // Restrict access to previous/active chat messages for non-logged-in users
+  const effectiveMessages = isSignedIn ? chatMessages : [];
+  const hasMessages = isSignedIn && effectiveMessages.length > 0;
+  const showWelcome = !isSignedIn || (!hasMessages && !activeQuestion && !activeProofData && !isProcessing);
 
   return (
     <div className="flex-1 flex overflow-hidden h-full">
@@ -106,7 +111,13 @@ export default function ChatPage({
               {onNewChat && (
                 <button
                   type="button"
-                  onClick={onNewChat}
+                  onClick={() => {
+                    if (!isSignedIn && openSignIn) {
+                      openSignIn();
+                      return;
+                    }
+                    onNewChat();
+                  }}
                   className="inline-flex items-center space-x-1.5 px-3 py-1 bg-[#EFF8F3] hover:bg-[#E7F3ED] border border-[#DDE7E2] hover:border-[#197A63] text-[#197A63] rounded-lg font-semibold transition-all cursor-pointer text-xs"
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -238,7 +249,7 @@ export default function ChatPage({
           {/* Conversation Thread: Render all turns in this session */}
           {hasMessages && (
             <div className="space-y-6">
-              {chatMessages.map((turn, idx) => (
+              {effectiveMessages.map((turn, idx) => (
                 <div key={turn.id || idx} className="space-y-4">
                   {/* User Question */}
                   <UserQuestion question={turn.question} />
@@ -297,7 +308,7 @@ export default function ChatPage({
           )}
 
           {/* Processing indicator when waiting for answer without optimistic turn */}
-          {isProcessing && (!chatMessages.some((t) => t.isPending)) && (
+          {isProcessing && (!effectiveMessages.some((t) => t.isPending)) && (
             <div className="bg-white border border-[#DDE7E2] rounded-2xl p-6 max-w-2xl shadow-xs flex items-center space-x-3">
               <span className="w-2.5 h-2.5 rounded-full bg-[#197A63] animate-ping"></span>
               <span className="text-xs font-semibold text-[#17302F]">

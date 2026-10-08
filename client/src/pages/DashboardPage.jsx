@@ -1,14 +1,17 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, ShieldCheck, ArrowRight, Lock } from "lucide-react";
-import { useAuth, useClerk } from "@clerk/clerk-react";
+import { useAuth, useUser, useClerk } from "@clerk/clerk-react";
+import { isUserAdmin } from "../components/AdminGuard";
 import { departmentsList } from "../data/mockCivicData";
 import { fetchDashboardStats } from "../services/api";
 
 export default function DashboardPage({ onAskQuestion, documents = [] }) {
   const [queryInput, setQueryInput] = useState("");
   const { isSignedIn } = useAuth();
+  const { user } = useUser();
   const { openSignIn } = useClerk();
+  const isAdmin = isUserAdmin(user);
   const [stats, setStats] = useState({
     totalDocuments: documents.length || 0,
     totalVersions: 0,
@@ -112,7 +115,16 @@ export default function DashboardPage({ onAskQuestion, documents = [] }) {
             <button
               key={dept.id}
               onClick={() => {
-                navigate("/departments");
+                if (isAdmin) {
+                  navigate("/departments");
+                } else {
+                  if (!isSignedIn && openSignIn) {
+                    openSignIn();
+                    return;
+                  }
+                  onAskQuestion(`What are the official municipal policies and guidelines under ${dept.name}?`, dept.name);
+                  navigate("/chat");
+                }
               }}
               className="px-3 py-1 bg-white hover:bg-[#EFF8F3] border border-[#DDE7E2] hover:border-[#197A63] rounded-full text-xs font-medium text-[#17302F] transition-colors cursor-pointer"
             >
