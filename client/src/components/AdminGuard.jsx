@@ -20,7 +20,11 @@ export function isUserAdmin(user) {
   return false;
 }
 
-export default function AdminGuard({ children }) {
+export default function AdminGuard({
+  children,
+  title = "Admin Portal",
+  description = "This area is restricted to authorized municipal officers. Document uploads, version control, and vector index audits require sign-in.",
+}) {
   const { isLoaded, isSignedIn } = useAuth();
   const { user } = useUser();
 
@@ -48,10 +52,10 @@ export default function AdminGuard({ children }) {
               Officer Clearance Required
             </div>
             <h2 className="text-xl sm:text-2xl font-extrabold text-[#0E3030] tracking-tight">
-              Admin Portal
+              {title}
             </h2>
             <p className="text-xs sm:text-sm text-[#6B7C7A] mt-2 leading-relaxed">
-              This area is restricted to authorized municipal officers. Document uploads, version control, and vector index audits require sign-in.
+              {description}
             </p>
           </div>
 

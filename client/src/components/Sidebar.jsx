@@ -1,4 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
+import { useAuth, useUser, useClerk, SignInButton } from "@clerk/clerk-react";
+import { isUserAdmin } from "./AdminGuard";
 import {
   MessageSquare,
   FileText,
@@ -10,6 +12,8 @@ import {
   FileCheck,
   Plus,
   Trash2,
+  Lock,
+  LogIn,
 } from "lucide-react";
 
 export default function Sidebar({
@@ -22,11 +26,15 @@ export default function Sidebar({
   onDeleteChat,
 }) {
   const location = useLocation();
+  const { isSignedIn, isLoaded } = useAuth();
+  const { user } = useUser();
+  const { openSignIn } = useClerk();
+  const isAdmin = isUserAdmin(user);
 
   const navLinks = [
     { path: "/chat", label: "Chat", icon: MessageSquare },
     { path: "/documents", label: "Documents", icon: FileText },
-    { path: "/departments", label: "Departments", icon: Building2 },
+    { path: "/departments", label: "Departments", icon: Building2, badge: "Private" },
     { path: "/admin", label: "Admin Portal", icon: Shield, badge: "Private" },
   ];
 
@@ -114,6 +122,10 @@ export default function Sidebar({
             <button
               type="button"
               onClick={() => {
+                if (isLoaded && !isSignedIn) {
+                  if (openSignIn) openSignIn();
+                  return;
+                }
                 onNewChat();
                 if (window.innerWidth < 1024) onClose();
               }}
@@ -128,13 +140,49 @@ export default function Sidebar({
             <span className="text-[11px] font-bold uppercase tracking-wider text-[#A2B8B5]">
               Previous Chats
             </span>
-            <span className="text-[10px] font-mono text-[#F4D35E] bg-[#163F3D] px-1.5 py-0.5 rounded">
-              {previousChats.length} {previousChats.length === 1 ? "Query" : "Queries"}
-            </span>
+            {!isLoaded ? (
+              <span className="text-[10px] font-mono text-[#A2B8B5] bg-[#163F3D] px-1.5 py-0.5 rounded">
+                ...
+              </span>
+            ) : !isSignedIn ? (
+              <span className="text-[10px] font-mono text-[#F4D35E] bg-[#163F3D] px-1.5 py-0.5 rounded flex items-center space-x-1">
+                <Lock className="w-2.5 h-2.5 mr-0.5 inline" />
+                <span>Locked</span>
+              </span>
+            ) : (
+              <span className="text-[10px] font-mono text-[#F4D35E] bg-[#163F3D] px-1.5 py-0.5 rounded">
+                {previousChats.length} {previousChats.length === 1 ? "Query" : "Queries"}
+              </span>
+            )}
           </div>
 
           <div className="space-y-1.5">
-            {previousChats.length === 0 ? (
+            {!isLoaded ? (
+              <div className="p-3 rounded-xl bg-[#163F3D]/30 border border-[#163F3D] text-left animate-pulse">
+                <p className="text-[11px] text-[#A2B8B5]">Loading chat history...</p>
+              </div>
+            ) : !isSignedIn ? (
+              <div className="p-3.5 rounded-xl bg-[#163F3D]/40 border border-[#163F3D] text-center space-y-2.5">
+                <div className="w-8 h-8 rounded-lg bg-[#163F3D] text-[#F4D35E] flex items-center justify-center mx-auto shadow-xs border border-[#197A63]/30">
+                  <Lock className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-white tracking-tight">Citizen Sign-In Required</p>
+                  <p className="text-[10px] text-[#A2B8B5] mt-1 leading-snug">
+                    Previous policy queries and citations are restricted to authenticated citizen accounts.
+                  </p>
+                </div>
+                <SignInButton mode="modal">
+                  <button
+                    type="button"
+                    className="w-full inline-flex items-center justify-center space-x-1.5 px-3 py-2 bg-[#197A63] hover:bg-[#163F3D] text-white rounded-lg text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                  >
+                    <LogIn className="w-3.5 h-3.5" />
+                    <span>Sign In to Access</span>
+                  </button>
+                </SignInButton>
+              </div>
+            ) : previousChats.length === 0 ? (
               <div className="p-3 rounded-xl bg-[#163F3D]/40 border border-[#163F3D] text-left">
                 <p className="text-[11px] text-[#A2B8B5]">No previous queries yet.</p>
                 <p className="text-[10px] text-[#6B7C7A] mt-0.5">Verified citations will appear here as you ask questions.</p>

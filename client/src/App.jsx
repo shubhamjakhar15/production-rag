@@ -117,24 +117,15 @@ function mapBackendResponseToProofData(backendData, questionText) {
 
 function AppContent() {
   const [documents, setDocuments] = useState([]);
-  const [previousChats, setPreviousChats] = useState(loadSavedChats);
-  const [chatMessages, setChatMessages] = useState(loadSavedActiveMessages);
-  const [activeChatId, setActiveChatId] = useState(() => {
-    try {
-      return localStorage.getItem(STORAGE_KEY_ACTIVE_CHAT_ID) || null;
-    } catch (e) {
-      return null;
-    }
-  });
-  const [activeProofData, setActiveProofData] = useState(() => {
-    const saved = loadSavedActiveMessages();
-    return saved.length ? saved[saved.length - 1].proofData : null;
-  });
+  const [previousChats, setPreviousChats] = useState([]);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [activeChatId, setActiveChatId] = useState(null);
+  const [activeProofData, setActiveProofData] = useState(null);
   const [isProofOpen, setIsProofOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedDepartment, setSelectedDepartment] = useState(null);
 
-  const { isSignedIn, getToken } = useAuth();
+  const { isSignedIn, isLoaded, getToken } = useAuth();
   const { openSignIn } = useClerk();
   const navigate = useNavigate();
 
@@ -143,29 +134,46 @@ function AppContent() {
     setAuthTokenGetter(() => getToken());
   }, [getToken]);
 
-  // Save previousChats to localStorage whenever it changes
+  // Synchronize authentication lifecycle and saved chats
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_PREVIOUS_CHATS, JSON.stringify(previousChats));
-    } catch (e) {}
-  }, [previousChats]);
+    if (!isLoaded) return;
 
-  // Save active conversation messages & ID to localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_ACTIVE_MESSAGES, JSON.stringify(chatMessages));
-      if (activeChatId) {
-        localStorage.setItem(STORAGE_KEY_ACTIVE_CHAT_ID, activeChatId);
-      } else {
+    if (!isSignedIn) {
+      // Disallow access & wipe saved chat sessions for non-logged-in users
+      setPreviousChats([]);
+      setChatMessages([]);
+      setActiveChatId(null);
+      setActiveProofData(null);
+      setIsProofOpen(false);
+      try {
+        localStorage.removeItem(STORAGE_KEY_PREVIOUS_CHATS);
         localStorage.removeItem(STORAGE_KEY_ACTIVE_CHAT_ID);
+        localStorage.removeItem(STORAGE_KEY_ACTIVE_MESSAGES);
+      } catch (e) {}
+      return;
+    }
+
+    // Authenticated user: restore from local cache first if available
+    try {
+      const savedChats = loadSavedChats();
+      if (savedChats && savedChats.length > 0) {
+        setPreviousChats(savedChats);
+      }
+      const savedMessages = loadSavedActiveMessages();
+      if (savedMessages && savedMessages.length > 0) {
+        setChatMessages(savedMessages);
+        const lastTurn = savedMessages[savedMessages.length - 1];
+        if (lastTurn?.proofData) {
+          setActiveProofData(lastTurn.proofData);
+        }
+      }
+      const savedChatId = localStorage.getItem(STORAGE_KEY_ACTIVE_CHAT_ID);
+      if (savedChatId) {
+        setActiveChatId(savedChatId);
       }
     } catch (e) {}
-  }, [chatMessages, activeChatId]);
 
-  // Synchronize saved chats from backend MongoDB when user is signed in
-  useEffect(() => {
-    if (!isSignedIn) return;
-
+    // Fetch user-specific remote chats from backend MongoDB
     fetchUserChats()
       .then((res) => {
         if (res.success && Array.isArray(res.chats)) {
@@ -220,7 +228,28 @@ function AppContent() {
         }
       })
       .catch((err) => console.warn("Could not sync remote chats:", err.message));
-  }, [isSignedIn]);
+  }, [isSignedIn, isLoaded]);
+
+  // Save previousChats to localStorage whenever it changes (only when authenticated)
+  useEffect(() => {
+    if (!isSignedIn) return;
+    try {
+      localStorage.setItem(STORAGE_KEY_PREVIOUS_CHATS, JSON.stringify(previousChats));
+    } catch (e) {}
+  }, [previousChats, isSignedIn]);
+
+  // Save active conversation messages & ID to localStorage (only when authenticated)
+  useEffect(() => {
+    if (!isSignedIn) return;
+    try {
+      localStorage.setItem(STORAGE_KEY_ACTIVE_MESSAGES, JSON.stringify(chatMessages));
+      if (activeChatId) {
+        localStorage.setItem(STORAGE_KEY_ACTIVE_CHAT_ID, activeChatId);
+      } else {
+        localStorage.removeItem(STORAGE_KEY_ACTIVE_CHAT_ID);
+      }
+    } catch (e) {}
+  }, [chatMessages, activeChatId, isSignedIn]);
 
   // Load real documents from backend
   const loadDocuments = () => {
@@ -404,6 +433,13 @@ function AppContent() {
 
   // Handler when selecting previous chat (loads saved real conversation thread & citations)
   const handleSelectPreviousChat = async (chat) => {
+    if (!isSignedIn) {
+      if (openSignIn) {
+        openSignIn({ redirectUrl: "/chat" });
+      }
+      return;
+    }
+
     setActiveChatId(chat.id);
 
     if (chat.messages && chat.messages.length > 0) {
@@ -493,6 +529,12 @@ function AppContent() {
 
   // Start fresh conversation (New Chat)
   const handleNewChat = () => {
+    if (!isSignedIn) {
+      if (openSignIn) {
+        openSignIn({ redirectUrl: "/chat" });
+      }
+      return;
+    }
     setActiveChatId(null);
     setChatMessages([]);
     setActiveProofData(null);
@@ -503,6 +545,10 @@ function AppContent() {
   // Delete a chat from list and backend
   const handleDeleteChat = async (chatId, e) => {
     if (e) e.stopPropagation();
+    if (!isSignedIn) {
+      if (openSignIn) openSignIn();
+      return;
+    }
     setPreviousChats((prev) => prev.filter((c) => c.id !== chatId && c.chatId !== chatId));
     if (activeChatId === chatId) {
       handleNewChat();
@@ -535,7 +581,7 @@ function AppContent() {
 
   return (
     <AppLayout
-      previousChats={previousChats}
+      previousChats={isSignedIn ? previousChats : []}
       onSelectPreviousChat={handleSelectPreviousChat}
       activeChatId={activeChatId}
       onNewChat={handleNewChat}
@@ -581,13 +627,18 @@ function AppContent() {
         <Route
           path="/departments"
           element={
-            <DepartmentsPage
-              documents={documents}
-              onSelectDepartment={(deptName) => {
-                setSelectedDepartment(deptName);
-                handleAskQuestion(`What are the official municipal policies and guidelines under ${deptName}?`);
-              }}
-            />
+            <AdminGuard
+              title="Departments Panel"
+              description="Municipal department details, jurisdictional circulars, and policy configurations are restricted to authorized administrators."
+            >
+              <DepartmentsPage
+                documents={documents}
+                onSelectDepartment={(deptName) => {
+                  setSelectedDepartment(deptName);
+                  handleAskQuestion(`What are the official municipal policies and guidelines under ${deptName}?`);
+                }}
+              />
+            </AdminGuard>
           }
         />
         {/* Settings redirected strictly to Admin Portal */}
