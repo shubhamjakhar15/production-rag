@@ -215,3 +215,50 @@ export function NoSourceAnswer({
   );
 }
 
+export function StreamingAnswer({
+  streamedText = "",
+  statusText = "Synthesizing verified policy response...",
+  citation = null,
+}) {
+  return (
+    <div className="space-y-6 max-w-3xl animate-in fade-in slide-in-from-bottom-2">
+      {/* Brand Header */}
+      <div className="flex items-center space-x-2.5">
+        <div className="w-7 h-7 rounded-lg bg-[#197A63] text-white flex items-center justify-center font-bold text-xs shadow-xs">
+          CL
+        </div>
+        <div>
+          <div className="flex items-center space-x-2">
+            <span className="font-bold text-sm text-[#0E3030]">CivicLens</span>
+            <span className="text-[10px] font-semibold bg-[#EFF8F3] text-[#197A63] px-2 py-0.5 rounded-full border border-[#DDE7E2] flex items-center space-x-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#197A63] animate-pulse"></span>
+              <span>Streaming Response...</span>
+            </span>
+          </div>
+          <p className="text-[11px] text-[#6B7C7A]">
+            {statusText}
+          </p>
+        </div>
+      </div>
+
+      {/* Streaming Card */}
+      <div className="bg-white border border-[#DDE7E2] rounded-2xl p-5 sm:p-6 shadow-xs space-y-4">
+        <div className="text-sm text-[#17302F] leading-relaxed whitespace-pre-wrap font-normal">
+          {streamedText}
+          <span className="inline-block w-1.5 h-4 ml-1 bg-[#197A63] animate-pulse align-middle rounded-xs" />
+        </div>
+
+        {citation?.document && (
+          <div className="pt-3 border-t border-[#DDE7E2] flex items-center space-x-2 text-[11px] text-[#6B7C7A]">
+            <FileText className="w-3.5 h-3.5 text-[#197A63] shrink-0" />
+            <span>
+              Referencing: <strong className="text-[#0E3030]">{citation.document}</strong> (Page {citation.page || 1})
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+

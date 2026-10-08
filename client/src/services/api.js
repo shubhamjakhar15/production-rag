@@ -98,6 +98,115 @@ export async function askPolicyQuery(question, sessionId = null, department = nu
 }
 
 /**
+ * Ask a grounded policy question with real-time SSE streaming.
+ * Yields status updates, source evidence candidates, live token deltas, and final verified response.
+ *
+ * @param {string} question - Natural language question
+ * @param {string} sessionId - Unique session ID for conversation memory
+ * @param {string} department - Optional department filter
+ * @param {Object} callbacks - { onStatus, onSources, onDelta, onDone, onError, signal }
+ * @returns {Promise<Object>} Final grounded response
+ */
+export async function askPolicyQueryStream(
+  question,
+  sessionId = null,
+  department = null,
+  { onStatus, onSources, onDelta, onDone, onError, signal } = {}
+) {
+  const payload = {
+    question,
+    session_id: sessionId || `session_${Date.now()}`,
+    stream: true,
+  };
+
+  if (department && department !== "All") {
+    payload.department = department;
+  }
+
+  const headers = await getHeaders(false);
+  headers["Accept"] = "text/event-stream";
+
+  const response = await fetch(`${API_BASE}/query?stream=true`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload),
+    signal,
+  });
+
+  if (!response.ok) {
+    let errorMsg = `HTTP ${response.status}`;
+    try {
+      const errJson = await response.json();
+      errorMsg = errJson.message || errorMsg;
+    } catch (e) {}
+    const error = new Error(errorMsg);
+    error.status = response.status;
+    if (onError) onError(error);
+    throw error;
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let buffer = "";
+  let finalResult = null;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const blocks = buffer.split("\n\n");
+      buffer = blocks.pop() || "";
+
+      for (const block of blocks) {
+        if (!block.trim()) continue;
+        const lines = block.split("\n");
+        let eventType = "message";
+        let dataStr = "";
+
+        for (const line of lines) {
+          if (line.startsWith("event:")) {
+            eventType = line.slice(6).trim();
+          } else if (line.startsWith("data:")) {
+            dataStr = line.slice(5).trim();
+          }
+        }
+
+        if (!dataStr) continue;
+
+        let parsedData;
+        try {
+          parsedData = JSON.parse(dataStr);
+        } catch (e) {
+          continue;
+        }
+
+        if (eventType === "status" && onStatus) {
+          onStatus(parsedData);
+        } else if (eventType === "sources" && onSources) {
+          onSources(parsedData);
+        } else if (eventType === "delta" && onDelta) {
+          onDelta(parsedData.delta || "");
+        } else if (eventType === "done") {
+          finalResult = parsedData;
+          if (onDone) onDone(parsedData);
+        } else if (eventType === "error") {
+          const err = new Error(parsedData.message || "Streaming error occurred");
+          if (onError) onError(err);
+          throw err;
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  return finalResult;
+}
+
+
+/**
  * Fetches all saved chat sessions for the authenticated citizen/user.
  */
 export async function fetchUserChats() {

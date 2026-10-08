@@ -11,6 +11,7 @@ import { useAuth, useClerk } from "@clerk/clerk-react";
 
 import {
   askPolicyQuery,
+  askPolicyQueryStream,
   fetchDocuments,
   deleteDocument,
   fetchUserChats,
@@ -251,26 +252,45 @@ function AppContent() {
     } catch (e) {}
   }, [chatMessages, activeChatId, isSignedIn]);
 
+  // Helper to normalize department names
+  const normalizeDepartment = (dept) => {
+    if (!dept) return "General";
+    const d = dept.trim();
+    if (/water|sanitation/i.test(d)) return "Water & Sanitation";
+    if (/housing/i.test(d)) return "Housing";
+    if (/road|infrastructure/i.test(d)) return "Roads & Infrastructure";
+    if (/waste|garbage/i.test(d)) return "Waste Management";
+    if (/property\s*tax|tax/i.test(d)) return "Property Tax";
+    if (/licens|permit/i.test(d)) return "Licensing & Permits";
+    if (/environment|park|tree/i.test(d)) return "Environment";
+    if (/emergency|fire|disaster/i.test(d)) return "Emergency Services";
+    return d;
+  };
+
   // Load real documents from backend
   const loadDocuments = () => {
     fetchDocuments()
       .then((res) => {
         if (res.success && Array.isArray(res.data)) {
-          const mappedDocs = res.data.map((d) => ({
-            id: d._id || d.id,
-            title: d.title,
-            department: d.category || "General",
-            pages: d.currentVersionId?.chunkCount ? Math.ceil(d.currentVersionId.chunkCount / 3) : 1,
-            uploadDate: d.createdAt ? new Date(d.createdAt).toLocaleDateString() : "Active",
-            status: d.status === "ACTIVE" ? "Indexed" : d.status,
-            ready: d.status === "ACTIVE",
-            fileSize: d.currentVersionId?.fileSize
-              ? `${(d.currentVersionId.fileSize / (1024 * 1024)).toFixed(1)} MB`
-              : "1.0 MB",
-            authority: d.category ? `${d.category} Directorate` : "Municipal Administration",
-            summary: d.description || "Official municipal policy document indexed into vector knowledge base.",
-            fileUrl: d.fileUrl || `/api/sources/${d._id}/file`,
-          }));
+          const mappedDocs = res.data.map((d) => {
+            const normalizedDept = normalizeDepartment(d.category);
+            return {
+              id: d._id || d.id,
+              title: d.title,
+              department: normalizedDept,
+              category: normalizedDept,
+              pages: d.currentVersionId?.chunkCount ? Math.ceil(d.currentVersionId.chunkCount / 3) : 1,
+              uploadDate: d.createdAt ? new Date(d.createdAt).toLocaleDateString() : "Active",
+              status: d.status === "ACTIVE" ? "Indexed" : d.status,
+              ready: d.status === "ACTIVE",
+              fileSize: d.currentVersionId?.fileSize
+                ? `${(d.currentVersionId.fileSize / (1024 * 1024)).toFixed(1)} MB`
+                : "1.0 MB",
+              authority: normalizedDept ? `${normalizedDept} Directorate` : "Municipal Administration",
+              summary: d.description || "Official municipal policy document indexed into vector knowledge base.",
+              fileUrl: d.fileUrl || `/api/sources/${d._id}/file`,
+            };
+          });
           setDocuments(mappedDocs);
         } else {
           setDocuments([]);
@@ -313,14 +333,68 @@ function AppContent() {
       id: tempTurnId,
       question: trimmedQuestion,
       isPending: true,
+      isStreaming: false,
+      statusText: "Searching municipal policy database...",
+      streamedText: "",
+      sources: [],
+      citation: null,
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     };
 
     setChatMessages((prev) => [...prev, pendingTurn]);
     navigate("/chat");
 
+    let accumulatedText = "";
+
     try {
-      const liveResult = await askPolicyQuery(trimmedQuestion, currentChatId, effectiveDept);
+      const liveResult = await askPolicyQueryStream(
+        trimmedQuestion,
+        currentChatId,
+        effectiveDept,
+        {
+          onStatus: (statusData) => {
+            setChatMessages((prev) =>
+              prev.map((turn) =>
+                turn.id === tempTurnId
+                  ? { ...turn, statusText: statusData.message || turn.statusText }
+                  : turn
+              )
+            );
+          },
+          onSources: (sourcesData) => {
+            const sourcesList = sourcesData.sources || [];
+            const topCitation = sourcesList[0] || null;
+            setChatMessages((prev) =>
+              prev.map((turn) =>
+                turn.id === tempTurnId
+                  ? {
+                      ...turn,
+                      sources: sourcesList,
+                      citation: topCitation,
+                      statusText: "Synthesizing verified policy response...",
+                    }
+                  : turn
+              )
+            );
+          },
+          onDelta: (delta) => {
+            accumulatedText += delta;
+            setChatMessages((prev) =>
+              prev.map((turn) =>
+                turn.id === tempTurnId
+                  ? {
+                      ...turn,
+                      isStreaming: true,
+                      statusText: "Synthesizing verified policy response...",
+                      streamedText: accumulatedText,
+                    }
+                  : turn
+              )
+            );
+          },
+        }
+      );
+
       const proofData = mapBackendResponseToProofData(liveResult, trimmedQuestion);
 
       setActiveProofData(proofData);
@@ -333,6 +407,7 @@ function AppContent() {
         answer: liveResult.answer,
         proofData,
         isPending: false,
+        isStreaming: false,
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       };
 
@@ -396,6 +471,7 @@ function AppContent() {
         question: trimmedQuestion,
         proofData: errorProofData,
         isPending: false,
+        isStreaming: false,
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       };
 

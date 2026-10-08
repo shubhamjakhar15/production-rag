@@ -58,11 +58,23 @@ export default function DepartmentsPage({ onSelectDepartment, documents = [] }) 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
         {departmentsList.map((dept) => {
           const Icon = iconMap[dept.icon] || FileText;
-          const matchingDocCount = (documents || []).filter(
-            (d) =>
-              (d.department && d.department.toLowerCase() === dept.name.toLowerCase()) ||
-              (d.department && d.department.toLowerCase() === dept.id.toLowerCase())
-          ).length;
+          const matchingDocCount = (documents || []).filter((d) => {
+            const docDept = (d.department || "").toLowerCase().trim();
+            const targetDept = (dept.name || "").toLowerCase().trim();
+            const targetId = (dept.id || "").toLowerCase().trim();
+
+            if (docDept === targetDept || docDept === targetId) return true;
+
+            // Flexible match for Water & Sanitation variants
+            if (
+              (targetId === "water" || targetDept.includes("water")) &&
+              (docDept.includes("water") || docDept.includes("sanitation"))
+            ) {
+              return true;
+            }
+
+            return false;
+          }).length;
 
           return (
             <div

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { ShieldCheck, Lock, LogIn, Building2, Plus, Sparkles } from "lucide-react";
 import { useAuth, useClerk, SignInButton } from "@clerk/clerk-react";
-import { UserQuestion, AIAnswer, NoSourceAnswer } from "../components/ChatComponents";
+import { UserQuestion, AIAnswer, NoSourceAnswer, StreamingAnswer } from "../components/ChatComponents";
 import ChatInput from "../components/ChatInput";
 import ProofPanel from "../components/ProofPanel";
 
@@ -197,7 +197,14 @@ export default function ChatPage({
                         const hasUploadedDocs = documents.some((d) => {
                           const dName = (d.department || "").toLowerCase().trim();
                           const target = theme.toLowerCase().trim();
-                          return dName === target || dName.includes(target) || target.includes(dName);
+                          if (dName === target || dName.includes(target) || target.includes(dName)) return true;
+                          if (
+                            target.includes("water") &&
+                            (dName.includes("water") || dName.includes("sanitation"))
+                          ) {
+                            return true;
+                          }
+                          return false;
                         });
                         const isSelected = deptScope === theme;
 
@@ -254,12 +261,18 @@ export default function ChatPage({
                   {/* User Question */}
                   <UserQuestion question={turn.question} />
 
-                  {/* AI Response or Pending Loader */}
-                  {turn.isPending ? (
+                  {/* AI Response, Live Streaming Answer, or Pending Loader */}
+                  {turn.isStreaming || (turn.isPending && turn.streamedText) ? (
+                    <StreamingAnswer
+                      streamedText={turn.streamedText}
+                      statusText={turn.statusText}
+                      citation={turn.citation || turn.sources?.[0]}
+                    />
+                  ) : turn.isPending ? (
                     <div className="bg-white border border-[#DDE7E2] rounded-2xl p-6 max-w-2xl shadow-xs flex items-center space-x-3">
                       <span className="w-2.5 h-2.5 rounded-full bg-[#197A63] animate-ping"></span>
                       <span className="text-xs font-semibold text-[#17302F]">
-                        Searching municipal vector index and extracting grounded proof...
+                        {turn.statusText || "Searching municipal vector index and extracting grounded proof..."}
                       </span>
                     </div>
                   ) : turn.proofData?.isNoSource ? (

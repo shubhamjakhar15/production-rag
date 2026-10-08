@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Send, Paperclip, Lock, LogIn } from "lucide-react";
+import { Send, Lock, LogIn } from "lucide-react";
 import { useAuth, useClerk, SignInButton } from "@clerk/clerk-react";
 
 export default function ChatInput({
@@ -35,13 +35,6 @@ export default function ChatInput({
         onSubmit={handleSubmit}
         className="relative bg-white border border-[#DDE7E2] rounded-2xl shadow-xs focus-within:border-[#197A63] focus-within:ring-2 focus-within:ring-[#197A63]/15 transition-all p-2 flex items-center"
       >
-        <button
-          type="button"
-          className="p-2 text-[#6B7C7A] hover:text-[#17302F] rounded-xl hover:bg-[#F7F8F5] transition-colors cursor-pointer"
-          title="Attach document reference"
-        >
-          <Paperclip className="w-4 h-4" />
-        </button>
 
         <input
           type="text"

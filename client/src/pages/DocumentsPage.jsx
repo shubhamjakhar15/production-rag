@@ -28,7 +28,11 @@ export default function DocumentsPage({
       doc.authority.toLowerCase().includes(searchTerm.toLowerCase()) ||
       doc.summary.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesDept =
-      selectedDeptFilter === "All" || doc.department === selectedDeptFilter;
+      selectedDeptFilter === "All" ||
+      doc.department === selectedDeptFilter ||
+      (selectedDeptFilter === "Water & Sanitation" &&
+        (doc.department?.toLowerCase().includes("water") ||
+          doc.department?.toLowerCase().includes("sanitation")));
     return matchesSearch && matchesDept;
   });
 
