@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+*/node_modules/
+client/node_modules/
+server/node_modules/
+
+# Environment and secrets
+.env
+.env.*
+*.env
+server/.env
+client/.env
+!.env.example
+!*.env.example
+
+# Build outputs
+dist/
+build/
+client/dist/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Uploads & Temp files
+server/uploads/documents/*.pdf
+!server/uploads/documents/.gitkeep
+
+# IDE and OS files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/settings.json

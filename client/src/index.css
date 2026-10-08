@@ -1,0 +1,65 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --bg-primary: #F7F8F5;
+    --dark-primary: #0E3030;
+    --dark-secondary: #163F3D;
+    --green-primary: #197A63;
+    --green-light: #E7F3ED;
+    --mint-soft: #EFF8F3;
+    --yellow-warm: #F4D35E;
+    --yellow-soft: #FFF6D6;
+    --text-primary: #17302F;
+    --text-muted: #6B7C7A;
+    --border-color: #DDE7E2;
+    --error-color: #C94A4A;
+    --success-color: #2E8B6D;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    background-color: #F7F8F5;
+    color: #17302F;
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Document sheet styling */
+.pdf-page-sheet {
+  background-color: #FFFFFF;
+  box-shadow: 0 4px 20px -2px rgba(14, 48, 48, 0.08), 0 2px 6px -1px rgba(14, 48, 48, 0.04);
+}
+
+/* Warm yellow highlight style */
+.warm-highlight {
+  background-color: #FFF6D6;
+  border-left: 3px solid #F4D35E;
+  color: #17302F;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F7F8F5;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #DDE7E2;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #6B7C7A;
+}
